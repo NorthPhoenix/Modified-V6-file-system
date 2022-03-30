@@ -44,6 +44,7 @@ superblock_type superBlock;
 inode_type root;
 int fd;
 int zeroArr[256];
+int chainArr[256];
 
 int open_fs(char *file_name)
 {
@@ -96,9 +97,9 @@ void fill_an_inode_and_write(int inum)
 
 //takes the address of a block to be added to the free list and returns 1 if all went well and -1 if something went wrong.
 int add_free_block(int address) {
-    lseek(fd,BLOCK_SIZE * (address),SEEK_SET);
-    write(fd,&zeroArr,sizeof(zeroArr));
     if (superBlock.nfree < 200) {
+        lseek(fd, BLOCK_SIZE * (address), SEEK_SET);
+        write(fd, &zeroArr, sizeof(zeroArr));
         superBlock.free[superBlock.nfree] = address;
         superBlock.nfree++;
         return 1;
@@ -110,9 +111,22 @@ int add_free_block(int address) {
 //returns the address of a free data block (from the free list) if everything is good and returns -1 should there be an error somewhere (say no free blocks left)
 int get_free_block() {
     superBlock.nfree--;
-    if (superBlock.free[superBlock.nfree] == 0) {
-        return -1;
+    if (superBlock.nfree > 0) {
+        if (superBlock.free[superBlock.nfree] == 0) {
+            return -1;
+        } else {
+            return superBlock.free[superBlock.nfree];
+        }
     } else {
+        //nfree is 0 here
+        int s = superBlock.free[0];
+        lseek(fd, BLOCK_SIZE * s, SEEK_SET);
+        read(fd, &chainArr, sizeof(chainArr));
+        superBlock.nfree = chainArr[0] - 1;
+        for(int i = 0; i < 250; i++) {
+            superBlock.free[i] = chainArr[i];
+        }
+        superBlock.free[superBlock.nfree] = s;
         return superBlock.free[superBlock.nfree];
     }
 }

@@ -65,5 +65,5 @@ Quit the program
 ## Group members
 - [Nikita Istomin](https://github.com/NorthPhoenix)
 - [Zubair Shaik](https://github.com/ZubairShaik7)
-- [Haniya Zafar]()
+- [Haniya Zafar](https://github.com/han1ya)
 

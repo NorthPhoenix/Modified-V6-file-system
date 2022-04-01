@@ -1,3 +1,19 @@
+/*
+University of Texas at Dallas--Computer Science Department
+CS 4348.005 Operating Systems Concepts Spring 2022
+Project 2 Part 1
+
+Members:
+Haniya Zafar
+Nikita Istomin
+Zubair Shaik
+
+Contributions: 
+Zubair: worked on the add_free_block(), and get_free_block(), and main() functions.
+Nikita: worked on add_free_block() and initfs() functions + debugging.
+Haniya: worked on add_free_block() and initfs() functions. 
+
+*/
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>

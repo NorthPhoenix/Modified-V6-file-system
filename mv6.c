@@ -99,17 +99,17 @@ void fill_root_and_write(int inodeBlocks)
 int add_free_block(int address) {
     if(superBlock.nfree == 200){
         lseek(fd, address * BLOCK_SIZE, SEEK_SET);
-        write(fd, superBlock.nfree, sizeof(int));
+        write(fd, &superBlock.nfree, sizeof(int));
         write(fd, superBlock.free, sizeof(int) * 200);
         superBlock.nfree = 0;
         lseek(fd, BLOCK_SIZE, SEEK_SET);
-        write(fd, superBlock, BLOCK_SIZE);
+        write(fd, &superBlock, BLOCK_SIZE);
     }
     if (superBlock.nfree < 200) {
         superBlock.free[superBlock.nfree] = address;
         superBlock.nfree++;
         lseek(fd, BLOCK_SIZE, SEEK_SET);
-        write(fd, superBlock, BLOCK_SIZE);
+        write(fd, &superBlock, BLOCK_SIZE);
         return 1;
     } else {
         return -1;
@@ -131,7 +131,8 @@ int get_free_block() {
         lseek(fd, BLOCK_SIZE * s, SEEK_SET);
         read(fd, &chainArr, sizeof(chainArr));
         superBlock.nfree = chainArr[0] - 1;
-        for(int i = 0; i < 250; i++) {
+        int i;
+        for(i = 0; i < 250; i++) {
             superBlock.free[i] = chainArr[i];
         }
         superBlock.free[superBlock.nfree] = s;
@@ -148,14 +149,14 @@ All i-nodes except i-node number 1 are (unallocated) set to free.
 Make sure that all free blocks are accessible from free[] array of the super block.
 One of the data blocks contains the root directory's contents (two entries . and ..)
 */
-void initfs(char* fileName, int blocks,int inodeBlocks) {
+void initfs(char* fileName, int blocks, int inodeBlocks) {
 
     // Open/create file that will be our file system
     if(open_fs(fileName) == -1){
-        printf("Failed to open file %s", fileName);
+        printf("Failed to open file %s\n", fileName);
     }
     else{
-        printf("Successfuly opened file %s", fileName);
+        printf("Successfuly opened file %s\n", fileName);
     }
 
     // Set all file blocks to 0
@@ -177,7 +178,7 @@ void initfs(char* fileName, int blocks,int inodeBlocks) {
     // superBlock.fmod;
     superBlock.time = time(NULL);
     lseek(fd, BLOCK_SIZE, SEEK_SET);
-    write(fd, superBlock, BLOCK_SIZE);
+    write(fd, &superBlock, BLOCK_SIZE);
 
     //Initialize free blocks
     int freeBlock; // bootBlock + superBlock + inodeBlocks + rootDirectoryBlock = first free block
@@ -200,7 +201,7 @@ void initfs(char* fileName, int blocks,int inodeBlocks) {
     write(fd, directory, 2*sizeof(dir_type));
 
     // Print initialization message
-    printf("File system initialized in \"%s\"", fileName);
+    printf("File system initialized in \"%s\"\n\n", fileName);
 }
 
 //quit program
@@ -221,8 +222,9 @@ int main()
     // printf("Value of inode1's addr[1] is %d\n", inode1.addr[1]);
     while(1){
         printf("Enter one of the two commands\n");
-        printf("initfs file_name n1 n2\n");
+        printf("initfs file_name fsize isize\n");
         printf("q\n");
+        printf("> ");
         char command[128];
         scanf(" %[^\n]s",command);       
         char* token = strtok(command," ");
@@ -230,7 +232,7 @@ int main()
             char* file_name = strtok(NULL," ");
             char* n1 = strtok(NULL," ");
             char* n2 = strtok(NULL," ");
-            //initfs(file_name,atoi(n1),atoi(n2));
+            initfs(file_name,atoi(n1),atoi(n2));
         }else if(strcmp(token,"q") == 0){
             quit();
         }else{

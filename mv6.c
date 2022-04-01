@@ -77,7 +77,7 @@ inode_type inode_reader(int inum, inode_type inode)
 }
 
 // Function to write inode number after filling some fileds
-void fill_an_inode_and_write(int inum)
+void fill_root_and_write(int inodeBlocks)
 {
     inode_type root;
     int i;
@@ -89,10 +89,10 @@ void fill_an_inode_and_write(int inum)
 
     root.size0 = 0;
     root.size1 = 2 * sizeof(dir_type);
-    root.addr[0] = 100; // assuming that blocks 2 to 99 are for i-nodes; 100 is the first data block that can hold root's directory contents
+    root.addr[0] = 2 + inodeBlocks; // first data block
     for (i = 1; i < 9; i++)
-        root.addr[i] = -1; // all other addr elements are null so setto -1
-    inode_writer(inum, root);
+        root.addr[i] = -1; // all other addr elements are null so set to -1
+    inode_writer(1, root);
 }
 
 //takes the address of a block to be added to the free list and returns 1 if all went well and -1 if something went wrong.
@@ -131,8 +131,68 @@ int get_free_block() {
     }
 }
 
-void initfs(int fileBlocks,int inodeBlocks) {
+/*
+initfs file_name n1 n2 Here, file_name is the name of the file in the native Unix machine (where you are running your program) that represents the disk drive.
+where n1 is the file system size in number of blocks and n2 is the number of blocks devoted to the i-nodes.
+In this case, set all data blocks free,except for one data block for storing the contents of i-node number 1,
+representing the root, which has the two entries . and ..
+All i-nodes except i-node number 1 are (unallocated) set to free.
+Make sure that all free blocks are accessible from free[] array of the super block.
+One of the data blocks contains the root directory's contents (two entries . and ..)
+*/
+void initfs(char* fileName, int blocks,int inodeBlocks) {
 
+    // Open/create file that will be our file system
+    if(open_fs(fileName) == -1){
+        printf("Failed to open file %s", fileName);
+    }
+    else{
+        printf("Successfuly opened file %s", fileName);
+    }
+
+    // Set all file blocks to 0
+    char buf[BLOCK_SIZE];
+    memset(buf,0,BLOCK_SIZE);
+    lseek(fd, 0, SEEK_SET);
+    int i;
+    for(i = 0; i < blocks; i++){
+        write(fd, buf, BLOCK_SIZE);
+    }
+
+    // Initialize the super block
+    superBlock.isize = inodeBlocks;
+    superBlock.fsize = blocks;
+    superBlock.nfree = 1;
+    superBlock.free[0] = 0;
+    // superBlock.flock;
+    // superBlock.ilock;
+    // superBlock.fmod;
+    superBlock.time = time(NULL);
+    lseek(fd, BLOCK_SIZE, SEEK_SET);
+    write(fd, superBlock, BLOCK_SIZE);
+
+    //Initialize free blocks
+    int freeBlock; // bootBlock + superBlock + inodeBlocks + rootDirectoryBlock = first free block
+    for (freeBlock = 2 + inodeBlocks + 1; freeBlock < blocks; freeBlock++) {
+        add_free_block(freeBlock);
+    }
+
+    // Initialize i-node for the root directory
+    fill_root_and_write(inodeBlocks);
+
+    // Initialize root directory
+    dir_type directory[2];
+    directory[0].inode = 1;
+    strcpy(directory[0].filename,".");
+
+    directory[1].inode = 1;
+    strcpy(directory[1].filename,"..");
+
+    lseek(fd, (2 + inodeBlocks) * BLOCK_SIZE, SEEK_SET);
+    write(fd, directory, 2*sizeof(dir_type));
+
+    // Print initialization message
+    printf("File system initialized in \"%s\"", fileName);
 }
 
 //quit program
@@ -145,23 +205,24 @@ void quit(){
 // The main function
 int main()
 {
-    inode_type inode1;
-    open_fs("Test_fs.txt");
-    fill_an_inode_and_write(1);
-    inode1 = inode_reader(1, inode1);
-    printf("Value of inode1's addr[0] is %d\n", inode1.addr[0]);
-    printf("Value of inode1's addr[1] is %d\n", inode1.addr[1]);
+    // inode_type inode1;
+    // open_fs("Test_fs.txt");
+    // fill_root_and_write();
+    // inode1 = inode_reader(1, inode1);
+    // printf("Value of inode1's addr[0] is %d\n", inode1.addr[0]);
+    // printf("Value of inode1's addr[1] is %d\n", inode1.addr[1]);
     while(1){
         printf("Enter one of the two commands\n");
         printf("initfs file_name n1 n2\n");
         printf("q\n");
         char command[128];
         scanf(" %[^\n]s",command);       
-        char * token = strtok(command," ");
+        char* token = strtok(command," ");
         if(strcmp(token,"initfs") == 0){
-            char * n1 = strtok(NULL," ");
-            char * n2 = strtok(NULL," ");
-            //initfs(atoi(n1),atoi(n2));
+            char* file_name = strtok(NULL," ");
+            char* n1 = strtok(NULL," ");
+            char* n2 = strtok(NULL," ");
+            //initfs(file_name,atoi(n1),atoi(n2));
         }else if(strcmp(token,"q") == 0){
             quit();
         }else{

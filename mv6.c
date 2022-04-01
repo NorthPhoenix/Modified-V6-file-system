@@ -132,7 +132,15 @@ int get_free_block() {
 }
 
 void initfs(int fileBlocks,int inodeBlocks) {
+       int block = get_free_block();            //gets a free block for the root directory
+        dir_type directory[1];
+        directory[0].inode = 0;
+        strcpy(directory[0].filename,".");      //creates 2 entries, '.' and '..'
 
+        directory[1].inode = 0;
+        strcpy(directory[1].filename,"..");
+
+       inode_writer(block, directory, 2*sizeof(dir_type));  //writes the root directory to the first inode 
 }
 
 //quit program

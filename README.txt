@@ -7,4 +7,4 @@ Compile Instructions:
 To build:
 gcc mv6.c -o filename 
 To run:
-./mv6 
+./filename

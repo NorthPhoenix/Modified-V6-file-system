@@ -1,0 +1,13 @@
+CS 4348.005 Project 2 Part 1 Report
+Members:
+Haniya Zafar
+Nikita Istomin
+Zubair Shaik
+
+Contributions: 
+Zubair: worked on the add_free_block() and get_free_block() functions.
+Nikita: worked on add_free_block() and initfs() function.
+Haniya: worked on add_free_block() function. 
+Lessons Learned: 
+-Using lseek() in conjunction with write() allows you to write to a file after a specified offset of bytes. 
+-Each block has a backup superblock that acts as a recovery block and can be used to represent a block without corrupting its data. 

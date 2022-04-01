@@ -97,11 +97,19 @@ void fill_root_and_write(int inodeBlocks)
 
 //takes the address of a block to be added to the free list and returns 1 if all went well and -1 if something went wrong.
 int add_free_block(int address) {
+    if(superBlock.nfree == 200){
+        lseek(fd, address * BLOCK_SIZE, SEEK_SET);
+        write(fd, superBlock.nfree, sizeof(int));
+        write(fd, superBlock.free, sizeof(int) * 200);
+        superBlock.nfree = 0;
+        lseek(fd, BLOCK_SIZE, SEEK_SET);
+        write(fd, superBlock, BLOCK_SIZE);
+    }
     if (superBlock.nfree < 200) {
-        lseek(fd, BLOCK_SIZE * (address), SEEK_SET);
-        write(fd, &zeroArr, sizeof(zeroArr));
         superBlock.free[superBlock.nfree] = address;
         superBlock.nfree++;
+        lseek(fd, BLOCK_SIZE, SEEK_SET);
+        write(fd, superBlock, BLOCK_SIZE);
         return 1;
     } else {
         return -1;

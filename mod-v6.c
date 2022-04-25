@@ -59,6 +59,7 @@ typedef struct
 superblock_type superBlock;
 inode_type root;
 int fd;
+int iNode;
 int zeroArr[256];
 int chainArr[256];
 
@@ -215,14 +216,68 @@ int initfs(char* fileName, int blocks, int inodeBlocks) {
 
     lseek(fd, (2 + inodeBlocks) * BLOCK_SIZE, SEEK_SET);
     write(fd, directory, 2*sizeof(dir_type));
-
+    iNode = 0;
     // Print initialization message
     printf("File system initialized in \"%s\"\n\n", fileName);
     return 1;
 }
 
-void cpout(char * sourcePath, char* destinationPath) {
+void readFromBlockOffset(int blockNumber, int offset, void * buffer, int nbytes)
+{
+        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
+        read(fd,buffer,nbytes);
+}
 
+inode_type getInode(int INumber){
+        inode_type iNode;
+        int blockNumber = (INumber * INODE_SIZE) / BLOCK_SIZE;    // need to remove 
+        int offset = (INumber * INODE_SIZE) % BLOCK_SIZE;
+        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
+        read(fd,&iNode,INODE_SIZE);
+        return iNode;
+}
+
+void cpout(char * sourcePath, char* destinationPath) {
+    char buf[BLOCK_SIZE] = {0};
+    dir_type direct[100];
+    inode_type currInode;
+    int fS, y;
+    if ((fS = open(sourcePath, O_RDWR | O_CREAT, 0600)) == -1) {
+        printf("Error opening file ");
+        return;
+    } 
+    int blockNum = (iNode * INODE_SIZE) / BLOCK_SIZE;
+    int off = (iNode * INODE_SIZE) % BLOCK_SIZE;
+    lseek(fd,(BLOCK_SIZE * blockNum) + off, SEEK_SET);
+    read(fd,&currInode,INODE_SIZE);
+    int currBlockNum = currInode.addr[0];
+    lseek(fd,(BLOCK_SIZE * currBlockNum), SEEK_SET);
+    read(fd,direct,currInode.size0);
+    for (int i = 0; i < currInode.size0 / sizeof(dir_type); i++) {
+        if (strcmp(destinationPath, direct[i].filename) == 0) {
+            inode_type currFile;
+            int blockNum = (direct[i].inode * INODE_SIZE) / BLOCK_SIZE;
+            int off = (direct[i].inode * INODE_SIZE) % BLOCK_SIZE;
+            lseek(fd,(BLOCK_SIZE * blockNum) + off, SEEK_SET);
+            read(fd,&iNode,INODE_SIZE);
+            unsigned int * s = currFile.addr;
+            if (currFile.flags == (1 << 15)) {
+                for (y = 0; y < currFile.size0/BLOCK_SIZE; y++) {
+                    blockNum = s[y];
+                    lseek(fd,(BLOCK_SIZE * blockNum), SEEK_SET);
+                    read(fd,buf,BLOCK_SIZE);
+                    write(fS, buf,BLOCK_SIZE);
+                }
+                blockNum = s[y];
+                lseek(fd,(BLOCK_SIZE * blockNum), SEEK_SET);
+                read(fd,buf,currFile.size0 % BLOCK_SIZE);
+                write(fS, buf, currFile.size0 % BLOCK_SIZE);
+            } else {
+                printf("no file \n");
+            }
+            return;
+        }
+    }
 }
 
 int cpin(char * sourcePath, char* destinationPath) {
@@ -230,7 +285,7 @@ int cpin(char * sourcePath, char* destinationPath) {
 }
 
 void removeDir(char * dirName) {
-    
+
 }
 
 //quit program

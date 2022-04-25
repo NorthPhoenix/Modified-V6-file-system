@@ -165,7 +165,7 @@ All i-nodes except i-node number 1 are (unallocated) set to free.
 Make sure that all free blocks are accessible from free[] array of the super block.
 One of the data blocks contains the root directory's contents (two entries . and ..)
 */
-void initfs(char* fileName, int blocks, int inodeBlocks) {
+int initfs(char* fileName, int blocks, int inodeBlocks) {
 
     // Open/create file that will be our file system
     if(open_fs(fileName) == -1){
@@ -218,6 +218,19 @@ void initfs(char* fileName, int blocks, int inodeBlocks) {
 
     // Print initialization message
     printf("File system initialized in \"%s\"\n\n", fileName);
+    return 1;
+}
+
+void cpout(char * sourcePath, char* destinationPath) {
+
+}
+
+int cpin(char * sourcePath, char* destinationPath) {
+
+}
+
+void removeDir(char * dirName) {
+    
 }
 
 //quit program
@@ -236,9 +249,13 @@ int main()
     // inode1 = inode_reader(1, inode1);
     // printf("Value of inode1's addr[0] is %d\n", inode1.addr[0]);
     // printf("Value of inode1's addr[1] is %d\n", inode1.addr[1]);
+    int setup = 0;
     while(1){
-        printf("Enter one of the two commands\n");
+        printf("Enter one of the five commands\n");
         printf("initfs file_name fsize isize\n");
+        printf("cpin external_file_name file_system_name\n");
+        printf("cpout file_system_name external_file_name\n");
+        printf("rm file_name\n");
         printf("q\n");
         printf("> ");
         char command[128];
@@ -248,8 +265,45 @@ int main()
             char* file_name = strtok(NULL," ");
             char* n1 = strtok(NULL," ");
             char* n2 = strtok(NULL," ");
-            initfs(file_name,atoi(n1),atoi(n2));
-        }else if(strcmp(token,"q") == 0){
+            if (initfs(file_name,atoi(n1),atoi(n2)) == 1) {
+                setup = 1;
+            }
+        } else if (strcmp(token,"cpin") == 0) {
+            if (setup != 1) {
+                printf("File System is not yet initialized. Use initfs command first.\n");
+                return 0;
+            }
+            char * sourceFile = strtok(NULL," ");
+            char * destinationFile = strtok(NULL," ");;
+            if (!sourceFile || !destinationFile) {
+                printf("Enter a source and destination path. \n");
+            } else {
+                cpin(sourceFile, destinationFile);
+            }
+        } else if (strcmp(token,"cpout") == 0) {
+            if (setup != 1) {
+                printf("File System is not yet initialized. Use initfs command first.\n");
+                return 0;
+            }
+            char * sourceFile = strtok(NULL," ");
+            char * destinationFile = strtok(NULL," ");;
+            if (!sourceFile || !destinationFile) {
+                printf("Enter a source and destination path. \n");
+            } else {
+                cpout(sourceFile, destinationFile);
+            }
+        } else if (strcmp(token,"rm") == 0) {
+            if (setup != 1) {
+                printf("File System is not yet initialized. Use initfs command first.\n");
+                return 0;
+            }
+            char * directory = strtok(NULL," ");
+            if (!directory) {
+                printf("Enter a directory\n");
+            } else {
+                removeDir(directory);
+            }
+        } else if(strcmp(token,"q") == 0){
             quit();
         }else{
             printf("No command found, Try again\n");

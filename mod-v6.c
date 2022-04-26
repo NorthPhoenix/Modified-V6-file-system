@@ -222,21 +222,6 @@ int initfs(char* fileName, int blocks, int inodeBlocks) {
     return 1;
 }
 
-void readFromBlockOffset(int blockNumber, int offset, void * buffer, int nbytes)
-{
-        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
-        read(fd,buffer,nbytes);
-}
-
-inode_type getInode(int INumber){
-        inode_type iNode;
-        int blockNumber = (INumber * INODE_SIZE) / BLOCK_SIZE;    // need to remove 
-        int offset = (INumber * INODE_SIZE) % BLOCK_SIZE;
-        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
-        read(fd,&iNode,INODE_SIZE);
-        return iNode;
-}
-
 void cpout(char * sourcePath, char* destinationPath) {
     char buf[BLOCK_SIZE] = {0};
     dir_type direct[100];
@@ -429,7 +414,7 @@ int cpin(char* externalFile, char* v6File) {
     int externalFileFD;
     if ((externalFileFD = open(externalFile, O_RDONLY)) == -1) {
         printf("Error opening file.\n");
-        return;
+        return 0;
     } 
 
     // look for the v6File in the root directory

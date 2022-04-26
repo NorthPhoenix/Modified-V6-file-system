@@ -280,11 +280,179 @@ void cpout(char * sourcePath, char* destinationPath) {
     }
 }
 
-int cpin(char * sourcePath, char* destinationPath) {
 
+/**
+ * @brief Returns an inode number of the file filename in the active v6 file system if found in the small directory block.
+ *        Else returns -1.
+ * 
+ * @param filename 
+ * @param block 
+ * @return int 
+ */
+int findFileInSmallDir(char* filename, int block)
+{
+    dir_type dir;
+    int dirCount;
+    for(dirCount = 0; dirCount < 32; ++dirCount){ //32 directory entries in a block
+        //read in the directory entry
+        lseek(fd,(block * BLOCK_SIZE) + (dirCount * sizeof(dir_type)),SEEK_SET);
+        read(fd,dir,sizeof(dir_type));
+
+        if(dir.inode < 1){//reached the last writen directory entry
+            return -1;
+        }
+
+        //compare the filename to the file in the directory entry
+        if(strcmp(dir.filename, filename) == 0){
+            return dir.inode;
+        }
+    }
 }
 
-void removeDir(char * dirName) {
+
+/**
+ * @brief atempts to reads all 256 integer block adresses from the block into the int array buf. Returns the true amount of integers read.
+ * 
+ * @param block 
+ * @param buf 
+ * @return int 
+ */
+int readIndirectBlock(int block, int* buf)
+{
+    return 0; //TODO
+} 
+
+
+/**
+ * @brief Returns an inode number of the file filename in the active v6 file system if found in the root.
+ *        Else returns -1.
+ * 
+ * @param filename 
+ * @return inode number 
+ */
+int findFileInRoot(char* filename)
+{
+    //read in first inode(it points to the root directory)
+    lseek(fd, 2*BLOCK_SIZE, SEEK_SET);
+    read(fd,&root,sizeof(inode_type));
+
+    //check how big is the root (small/medium/long/super_long)
+    if((root.flags & (1 << 12)) == 0 && (root.flags & (1 << 11)) == 0) //if small (00)
+    {
+        int i;
+        for(i = 0; i < 9; ++i){ //loop through addr[]
+            if(root.addr[i] <= 0){//block number is invalid
+                break;
+            }
+            int fileInode = findFileInSmallDir(filename, root.addr[i]); //look for filename in addr[i]
+            if(fileInode != -1){
+                return fileInode;
+            }
+        }
+    }
+    else if ((root.flags & (1 << 12)) == 0 && (root.flags & (1 << 11)) == (1 << 11)) //if medium (01)
+    {
+        int* singleIndirectBuf[256]; // 256 block addresses(int) per an inderect block 
+        int i;
+        for(i = 0; i < 9; ++i){ //loop through addr[]
+            if(root.addr[i] <= 0){//block number is invalid
+                break;
+            }
+            int dataBlocks = readIndirectBlock(root.addr[i], &singleIndirectBuf);
+            int j;
+            for(j = 0; j < dataBlocks; ++j){//loop over the single indirect block
+                int fileInode = findFileInSmallDir(filename, singleIndirectBuf[j]); //look for filename in block at j
+                if(fileInode != -1){
+                    return fileInode;
+                }
+            }
+        }
+    }
+    else if ((root.flags & (1 << 12)) == (1 << 12) && (root.flags & (1 << 11)) == 0) //if long (10)
+    {
+        int* singleIndirectBuf[256]; // 256 block addresses(int) per an inderect block 
+        int* doubleIndirectBuf[256]; // 256 block addresses(int) per an inderect block 
+        int i;
+        for(i = 0; i < 9; ++i){ //loop through addr[]
+            if(root.addr[i] <= 0){//block number is invalid
+                break;
+            }
+            int singleIndirectBlocks = readIndirectBlock(root.addr[i], &doubleIndirectBuf);
+            int j;
+            for(j = 0; j < singleIndirectBlocks; ++j){//loop over the double indirect block
+                int dataBlocks = readIndirectBlock(doubleIndirectBuf[j], &singleIndirectBuf);
+                int k;
+                for(k = 0; k < dataBlocks; ++k){//loop over the single indirect block
+                    int fileInode = findFileInSmallDir(filename, singleIndirectBuf[k]); //look for filename in block at j
+                    if(fileInode != -1){
+                        return fileInode;
+                    }
+                }
+            }
+        }
+    }
+    else //if super long (11)
+    {
+        int* singleIndirectBuf[256]; // 256 block addresses(int) per an inderect block 
+        int* doubleIndirectBuf[256]; // 256 block addresses(int) per an inderect block 
+        int* tripleIndirectBuf[256]; // 256 block addresses(int) per an inderect block 
+        int i;
+        for(i = 0; i < 9; ++i){ //loop through addr[]
+            if(root.addr[i] <= 0){//block number is invalid
+                break;
+            }
+            int doubleIndirectBlocks = readIndirectBlock(root.addr[i], &tripleIndirectBuf);
+            int j;
+            for(j = 0; j < doubleIndirectBlocks; ++j){//loop over the double indirect block
+                int singleIndirectBlocks = readIndirectBlock(tripleIndirectBuf[j], &doubleIndirectBuf);
+                int k;
+                for(k = 0; k < singleIndirectBlocks; ++k){//loop over the double indirect block
+                    int dataBlocks = readIndirectBlock(doubleIndirectBuf[k], &singleIndirectBuf);
+                    int l;
+                    for(l = 0; l < dataBlocks; ++l){//loop over the single indirect block
+                        int fileInode = findFileInSmallDir(filename, singleIndirectBuf[l]); //look for filename in block at j
+                        if(fileInode != -1){
+                            return fileInode;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return -1;
+}
+
+
+int cpin(char* externalFile, char* v6File) {
+    // open an external file
+    int externalFileFD;
+    if ((externalFileFD = open(externalFile, O_RDONLY)) == -1) {
+        printf("Error opening file.\n");
+        return;
+    } 
+
+    // look for the v6File in the root directory
+    // if it exists -> overite it
+    // else -> add a new entry to the root directory (expand root if needed)
+    bool override = false;
+    if(findFileInRoot(v6File)){
+        override = true;
+    }
+
+    
+
+    // create an inode
+    unsigned int inodeNum = 2; //container for the inode number (=2 because that's the first potential free inode for a new file)
+
+    // setup the inode
+
+    // get free blocks as needed and copy the contents of the external file into the new v6 file
+
+    
+}
+
+void rm(char * fileName) {
 
 }
 
@@ -352,11 +520,11 @@ int main()
                 printf("File System is not yet initialized. Use initfs command first.\n");
                 return 0;
             }
-            char * directory = strtok(NULL," ");
-            if (!directory) {
-                printf("Enter a directory\n");
+            char * fileName = strtok(NULL," ");
+            if (!fileName) {
+                printf("Enter a filename\n");
             } else {
-                removeDir(directory);
+                rm(fileName);
             }
         } else if(strcmp(token,"q") == 0){
             quit();

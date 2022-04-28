@@ -224,21 +224,6 @@ int initfs(char* fileName, int blocks, int inodeBlocks) {
     return 1;
 }
 
-void readFromBlockOffset(int blockNumber, int offset, void * buffer, int nbytes)
-{
-        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
-        read(fd,buffer,nbytes);
-}
-
-inode_type getInode(int INumber){
-        inode_type iNode;
-        int blockNumber = (INumber * INODE_SIZE) / BLOCK_SIZE;    // need to remove 
-        int offset = (INumber * INODE_SIZE) % BLOCK_SIZE;
-        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
-        read(fd,&iNode,INODE_SIZE);
-        return iNode;
-}
-
 void cpout(char * sourcePath, char* destinationPath) {
     char buf[BLOCK_SIZE] = {0};
     dir_type direct[100];

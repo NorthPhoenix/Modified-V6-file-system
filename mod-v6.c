@@ -65,6 +65,31 @@ int iNode;
 int zeroArr[256];
 int chainArr[256];
 
+
+//function declarations
+int open_fs(char *file_name);
+void inode_writer(int inum, inode_type inode);
+inode_type inode_reader(int inum, inode_type inode);
+
+void fill_root_and_write(int inodeBlocks);
+int add_free_block(int address);
+int get_free_block();
+int get_free_block();int initfs(char* fileName, int blocks, int inodeBlocks);
+
+int cpin(char* externalFile, char* v6File);
+void cpout(char * sourcePath, char* destinationPath);
+void rm(char * fileName);
+
+int findFileInDirBlock(char* filename, int block);
+int getNextFileBlock(inode_type inode, int* save);
+int findFileInRoot(char* filename);
+int getLastFileBlock(int inodeNum);
+off_t fileSize(const char *filename);
+
+void quit();
+
+
+
 int open_fs(char *file_name)
 {
     fd = open(file_name, O_RDWR | O_CREAT, 0600);
@@ -492,11 +517,11 @@ int cpin(char* externalFile, char* v6File)
     lseek(fd, BLOCK_SIZE, SEEK_SET);
     read(fd, &superBlock, BLOCK_SIZE);
 
-    inode_type iNode;
+    inode_type inode;
     for(inodeNum = 2; inodeNum < superBlock.isize * (BLOCK_SIZE / INODE_SIZE); ++inodeNum) //loop over all inode numbers until we find an unallocated inode
     {
-        iNode = inode_reader(inodeNum, iNode);
-        if((iNode.flags & (1 << 15)) == 0){
+        inode = inode_reader(inodeNum, inode);
+        if((inode.flags & (1 << 15)) == 0){
             break; //found unallocated inode
         }
     }
@@ -506,32 +531,32 @@ int cpin(char* externalFile, char* v6File)
     }
 
     // setup the inode
-    iNode.flags |= 1 << 15; //inode allocated
+    inode.flags |= 1 << 15; //inode allocated
 
     //figure out how big the file is...
     off_t fSize = fileSize(externalFile);
-    iNode.size1 = fSize;
+    inode.size1 = fSize;
     if(fSize > (sizeof(root.addr) / sizeof(int)) * (BLOCK_SIZE / sizeof(int)) ){ //long / super long 
-        iNode.flags |= 1 << 12;
+        inode.flags |= 1 << 12;
 
         if(fSize > (sizeof(root.addr) / sizeof(int)) * (BLOCK_SIZE / sizeof(int)) * (BLOCK_SIZE / sizeof(int))) //super long
-            iNode.flags |= 1 << 11;
+            inode.flags |= 1 << 11;
     }
     else{ // small / medium
         if(fSize > (sizeof(root.addr) / sizeof(int))) // medium
-            iNode.flags |= 1 << 11;
+            inode.flags |= 1 << 11;
     }
 
     int i;
     for (i = 0; i < 9; i++)
-        iNode.addr[i] = -1; // all addr elements are null so set to -1
+        inode.addr[i] = -1; // all addr elements are null so set to -1
 
 
     // get free blocks as needed and copy the contents of the external file into the new v6 file
     char* blockBuf[BLOCK_SIZE];
     int blockCount;
-    int blockCountMax = (iNode.size1 % BLOCK_SIZE == 0) ? (iNode.size1 / BLOCK_SIZE) : ((iNode.size1 / BLOCK_SIZE) + 1);
-    if((iNode.flags & (1 << 12)) == 0 && (iNode.flags & (1 << 11)) == 0) //if small (00)
+    int blockCountMax = (inode.size1 % BLOCK_SIZE == 0) ? (inode.size1 / BLOCK_SIZE) : ((inode.size1 / BLOCK_SIZE) + 1);
+    if((inode.flags & (1 << 12)) == 0 && (inode.flags & (1 << 11)) == 0) //if small (00)
     {
         for(blockCount = 0; blockCount < blockCountMax; ++blockCount)
         {
@@ -541,10 +566,10 @@ int cpin(char* externalFile, char* v6File)
             lseek(fd, freeBlock * BLOCK_SIZE, SEEK_SET);
             write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
 
-            iNode.addr[blockCount] = freeBlock;
+            inode.addr[blockCount] = freeBlock;
         }
     }
-    else if ((iNode.flags & (1 << 12)) == 0 && (iNode.flags & (1 << 11)) == (1 << 11)) //if medium (01)
+    else if ((inode.flags & (1 << 12)) == 0 && (inode.flags & (1 << 11)) == (1 << 11)) //if medium (01)
     {
         for(blockCount = 0; blockCount < blockCountMax; ++blockCount)
         {
@@ -555,16 +580,16 @@ int cpin(char* externalFile, char* v6File)
             write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
 
             int addrIndex = blockCount / INDIRECT_SIZE;
-            if(iNode.addr[addrIndex] == -1){
-                iNode.addr[addrIndex] = get_free_block();
+            if(inode.addr[addrIndex] == -1){
+                inode.addr[addrIndex] = get_free_block();
             }
             int singleOffset = blockCount % INDIRECT_SIZE;
 
-            lseek(fd,(iNode.addr[addrIndex] * BLOCK_SIZE) + (singleOffset * sizeof(int)), SEEK_SET);
+            lseek(fd,(inode.addr[addrIndex] * BLOCK_SIZE) + (singleOffset * sizeof(int)), SEEK_SET);
             write(fd, freeBlock, sizeof(int));
         }
     }
-    else if ((iNode.flags & (1 << 12)) == (1 << 12) && (iNode.flags & (1 << 11)) == 0) //if long (10)
+    else if ((inode.flags & (1 << 12)) == (1 << 12) && (inode.flags & (1 << 11)) == 0) //if long (10)
     {
         for(blockCount = 0; blockCount < blockCountMax; ++blockCount)
         {
@@ -575,20 +600,20 @@ int cpin(char* externalFile, char* v6File)
             write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
 
             int addrIndex = (blockCount / INDIRECT_SIZE) / INDIRECT_SIZE;
-            if(iNode.addr[addrIndex] == -1){
-                iNode.addr[addrIndex] = get_free_block();
+            if(inode.addr[addrIndex] == -1){
+                inode.addr[addrIndex] = get_free_block();
             }
             int doubleOffset = (blockCount / INDIRECT_SIZE) % INDIRECT_SIZE;
             int singleOffset = blockCount % INDIRECT_SIZE;
 
             //read the block # in -> check if't a valid block # -> possibly get a free block
-            lseek(fd, (iNode.addr[addrIndex] * BLOCK_SIZE) + (doubleOffset * sizeof(int)), SEEK_SET);
+            lseek(fd, (inode.addr[addrIndex] * BLOCK_SIZE) + (doubleOffset * sizeof(int)), SEEK_SET);
             int blockNum;
             read(fd, &blockNum, sizeof(int));
 
             if(blockNum < 2 + superBlock.isize){ //if invalid block number
                 blockNum = get_free_block();
-                lseek(fd, (iNode.addr[addrIndex] * BLOCK_SIZE) + (doubleOffset * sizeof(int)), SEEK_SET);
+                lseek(fd, (inode.addr[addrIndex] * BLOCK_SIZE) + (doubleOffset * sizeof(int)), SEEK_SET);
                 write(fd, blockNum, sizeof(int));
             }
 
@@ -607,21 +632,21 @@ int cpin(char* externalFile, char* v6File)
             write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
 
             int addrIndex = ((blockCount / INDIRECT_SIZE) / INDIRECT_SIZE) / INDIRECT_SIZE;
-            if(iNode.addr[addrIndex] == -1){
-                iNode.addr[addrIndex] = get_free_block();
+            if(inode.addr[addrIndex] == -1){
+                inode.addr[addrIndex] = get_free_block();
             }
             int tripleOffset = ((blockCount / INDIRECT_SIZE) / INDIRECT_SIZE) % INDIRECT_SIZE;
             int doubleOffset = (blockCount / INDIRECT_SIZE) % INDIRECT_SIZE;
             int singleOffset = blockCount % INDIRECT_SIZE;
 
             //read the block # in -> check if't a valid block # -> possibly get a free block
-            lseek(fd, (iNode.addr[addrIndex] * BLOCK_SIZE) + (tripleOffset * sizeof(int)), SEEK_SET);
+            lseek(fd, (inode.addr[addrIndex] * BLOCK_SIZE) + (tripleOffset * sizeof(int)), SEEK_SET);
             int blockNum1;
             read(fd, &blockNum1, sizeof(int));
 
             if(blockNum1 < 2 + superBlock.isize){ //if invalid block number
                 blockNum1 = get_free_block();
-                lseek(fd, (iNode.addr[addrIndex] * BLOCK_SIZE) + (tripleOffset * sizeof(int)), SEEK_SET);
+                lseek(fd, (inode.addr[addrIndex] * BLOCK_SIZE) + (tripleOffset * sizeof(int)), SEEK_SET);
                 write(fd, blockNum1, sizeof(int));
             }
 

@@ -74,7 +74,9 @@ inode_type inode_reader(int inum, inode_type inode);
 void fill_root_and_write(int inodeBlocks);
 int add_free_block(int address);
 int get_free_block();
-int get_free_block();int initfs(char* fileName, int blocks, int inodeBlocks);
+int get_free_block();
+int initfs(char* fileName, int blocks, int inodeBlocks);
+int openFileSystem(char* system);
 
 int cpin(char* externalFile, char* v6File);
 void cpout(char * sourcePath, char* destinationPath);
@@ -307,8 +309,8 @@ int findFileInDirBlock(char* filename, int block)
     int dirCount;
     for(dirCount = 0; dirCount < 32; ++dirCount){ //32 directory entries in a block
         //read in the directory entry
-        lseek(fd,(block * BLOCK_SIZE) + (dirCount * sizeof(dir_type)),SEEK_SET);
-        read(fd,dir,sizeof(dir_type));
+        lseek(fd, (block * BLOCK_SIZE) + (dirCount * sizeof(dir_type)), SEEK_SET);
+        read(fd, &dir, sizeof(dir_type));
 
         if(dir.inode < 1){//reached the last writen directory entry
             return -1;
@@ -331,7 +333,10 @@ int findFileInDirBlock(char* filename, int block)
  * @return int 
  */
 int getNextFileBlock(inode_type inode, int* save){
+    // printf("########## Starting getNextFileBlock() execution ##########\n");
     if(save[0] != 1){ //not setup
+        // printf("\tSave array is not setup. Setting up...\n");
+        save[0] = 1;
         save[2] = 0;
         //find size of the directory
         if((inode.flags & (1 << 12)) == 0 && (inode.flags & (1 << 11)) == 0) //if small (00)
@@ -350,36 +355,47 @@ int getNextFileBlock(inode_type inode, int* save){
         {
             save[1] = 3;
         }
+        // printf("\tSave array is setup.\n");
     }
 
 
     if(save[1] == 0) { //if small (00)
         if(save[2] >= 9){
             save[0] = -1;
+            // printf("\tLast block reached.\n");
+            // printf("########## Ending getNextFileBlock() execution ##########\n");
             return -1;
         }
         int blockNum = inode.addr[save[2]];
-        ++save[2];
+        save[2]++;
+        // printf("\tReturning next block.\n");
+        // printf("########## Ending getNextFileBlock() execution ##########\n");
         return blockNum;
     }
     else if(save[1] == 0) { //if medium (01)
         if(save[2] >= 9 * INDIRECT_SIZE){
             save[0] = -1;
+            // printf("\tLast block reached.\n");
+            // printf("########## Ending getNextFileBlock() execution ##########\n");
             return -1;
         }
         int firstIndirect = save[2] / INDIRECT_SIZE; //which index in addr[]
         int offset = save[2] % INDIRECT_SIZE; //which int at a single indirect block
         int blockNum;
 
-        lsek(fd, (inode.addr[firstIndirect] * BLOCK_SIZE) + (offset * sizeof(int)), SEEK_SET);
+        lseek(fd, (inode.addr[firstIndirect] * BLOCK_SIZE) + (offset * sizeof(int)), SEEK_SET);
         read(fd, &blockNum, sizeof(int));
 
-        ++save[2];
+        save[2]++;
+        // printf("\tReturning next block.\n");
+        // printf("########## Ending getNextFileBlock() execution ##########\n");
         return blockNum;
     }
     else if(save[1] == 0) { //if long (10)
         if(save[2] >= 9 * INDIRECT_SIZE * INDIRECT_SIZE){
             save[0] = -1;
+            // printf("\tLast block reached.\n");
+            // printf("########## Ending getNextFileBlock() execution ##########\n");
             return -1;
         }
         int firstIndirect = (save[2] / INDIRECT_SIZE) / INDIRECT_SIZE; //which index in addr[]
@@ -393,12 +409,16 @@ int getNextFileBlock(inode_type inode, int* save){
         lseek(fd, (blockNum * BLOCK_SIZE) + (offset * sizeof(int)), SEEK_SET);
         read(fd, &blockNum, sizeof(int));
 
-        ++save[2];
+        save[2]++;
+        // printf("\tReturning next block.\n");
+        // printf("########## Ending getNextFileBlock() execution ##########\n");
         return blockNum;
     }
     else { //if super long (11)
         if(save[2] >= 9 * INDIRECT_SIZE * INDIRECT_SIZE * INDIRECT_SIZE){
             save[0] = -1;
+            // printf("\tLast block reached.\n");
+            // printf("########## Ending getNextFileBlock() execution ##########\n");
             return -1;
         }
         int firstIndirect = ((save[2] / INDIRECT_SIZE) / INDIRECT_SIZE) / INDIRECT_SIZE; //which index in addr[]
@@ -416,7 +436,9 @@ int getNextFileBlock(inode_type inode, int* save){
         lseek(fd, (blockNum * BLOCK_SIZE) + (offset * sizeof(int)), SEEK_SET);
         read(fd, &blockNum, sizeof(int));
 
-        ++save[2];
+        save[2]++;
+        // printf("\tReturning next block.\n");
+        // printf("########## Ending getNextFileBlock() execution ##########\n");
         return blockNum;
     }
 }
@@ -431,18 +453,26 @@ int getNextFileBlock(inode_type inode, int* save){
  */
 int findFileInRoot(char* filename)
 {
+    // printf("########## Starting findFileInRoot() execution ##########\n\n");
     //read in first inode(it points to the root directory)
     root = inode_reader(1,root);
     int save[] = {0,0,0};
     int blockNum;
+    // printf("\tSetup complete.\n");
 
     while((blockNum = getNextFileBlock(root, save)) != -1)
     {
+        // printf("\t\tLoking through a file block %i\n", blockNum);
         int fileInode = findFileInDirBlock(filename, blockNum); //look for filename in block
-        if(fileInode != -1)
+        if(fileInode != -1){
+            // printf("\tFile found.\n");
+            // printf("\n########## Ending findFileInRoot() execution ##########\n");
             return fileInode;
+        }
     }
 
+    // printf("\tNo file found.\n");
+    // printf("\n########## Ending findFileInRoot() execution ##########\n");
     return -1;
 }
 
@@ -489,70 +519,102 @@ off_t fileSize(const char *filename) {
 
 int cpin(char* externalFile, char* v6File)
 {
+    printf("########## Starting cpin execution ##########\n\n");
     //check if file name fits in the directory entry
     if(sizeof(v6File) / sizeof(char) > 28){
-        printf("ERROR: v6 filename is too long, choose a shorter name");
+        printf("ERROR: v6 filename is too long, choose a shorter name.\n");
+        printf("########## Ending cpin execution ##########\n\n");
         return EXIT_FAILURE;
     }
+    printf("\tChecked that given new filename is acceptable.\n");
 
     // open an external file
     int externalFileFD;
     if ((externalFileFD = open(externalFile, O_RDONLY)) == -1) {
         printf("ERROR: Error opening file.\n");
+        printf("\n########## Ending cpin execution ##########\n\n");
         return EXIT_FAILURE;
     } 
     lseek(externalFileFD, 0, SEEK_SET);
+    printf("\tSuccesfully oppened the external file.\n\n");
 
     // look for the v6File in the root directory
     // if it exists -> remove it
-
+    printf("\tLooking for internal file matching the new filename...\n");
     unsigned int inodeNum; //container for the inode number 
     // int override = 0;
     if((inodeNum = findFileInRoot(v6File)) != -1){
+        printf("\t\tFound a file. Removing it...\n");
         rm(v6File); //remove the existing file
+        printf("\t\tFile removed.\n\n");
+    }
+    else{
+        printf("\t\tNo file found.\n\n");
     }
 
     // create an inode
 
+    printf("\tCreating a new i-node...\n");
     lseek(fd, BLOCK_SIZE, SEEK_SET);
     read(fd, &superBlock, BLOCK_SIZE);
 
+    printf("\t\tLooking for a free i-node number...\n");
     inode_type inode;
     for(inodeNum = 2; inodeNum < superBlock.isize * (BLOCK_SIZE / INODE_SIZE); ++inodeNum) //loop over all inode numbers until we find an unallocated inode
     {
+        printf("\t\tChecking i-node #%i\n", inodeNum);
         inode = inode_reader(inodeNum, inode);
+        // printf("\t\t\tinode.flags = %i\n",inode.flags);
         if((inode.flags & (1 << 15)) == 0){
+            printf("\t\tFound a free i-node.\n\n");
             break; //found unallocated inode
         }
     }
-    if(inodeNum < 2){
-        printf("Error copping the file. No more free i-nodes. \n");
+    if(inodeNum >= superBlock.isize * (BLOCK_SIZE / INODE_SIZE)){
+        printf("ERROR: Error copping the file. No more free i-nodes. \n");
+        printf("\n########## Ending cpin execution ##########\n\n");
         return EXIT_FAILURE;
     }
 
     // setup the inode
+    printf("\tSetting up a new i-node...\n");
     inode.flags |= 1 << 15; //inode allocated
+    printf("\t\ti-node is allocated.\n");
 
     //figure out how big the file is...
     off_t fSize = fileSize(externalFile);
     inode.size1 = fSize;
+    printf("\t\tNumerical file size set.\n");
     if(fSize > (sizeof(root.addr) / sizeof(int)) * (BLOCK_SIZE / sizeof(int)) ){ //long / super long 
         inode.flags |= 1 << 12;
-
-        if(fSize > (sizeof(root.addr) / sizeof(int)) * (BLOCK_SIZE / sizeof(int)) * (BLOCK_SIZE / sizeof(int))) //super long
+        if(fSize > (sizeof(root.addr) / sizeof(int)) * (BLOCK_SIZE / sizeof(int)) * (BLOCK_SIZE / sizeof(int))){ //super long
             inode.flags |= 1 << 11;
+            printf("\t\tFIle size is set to be SUPER LONG.\n");
+        }
+        else{
+            printf("\t\tFIle size is set to be LONG.\n");
+        }
     }
     else{ // small / medium
-        if(fSize > (sizeof(root.addr) / sizeof(int))) // medium
+        if(fSize > (sizeof(root.addr) / sizeof(int))){ // medium
             inode.flags |= 1 << 11;
+            printf("\t\tFIle size is set to be MEDIUM.\n");
+        }
+        else{
+            printf("\t\tFIle size is set to be SMALL.\n");
+        }
     }
 
     int i;
     for (i = 0; i < 9; i++)
         inode.addr[i] = -1; // all addr elements are null so set to -1
+    printf("\t\tContents of addr array set to -1\n");
+    inode_writer(inodeNum, inode);
+    printf("\ti-node setup done.\n\n");
 
 
     // get free blocks as needed and copy the contents of the external file into the new v6 file
+    printf("\tCopying contents of the external file into the internal file...\n");
     char* blockBuf[BLOCK_SIZE];
     int blockCount;
     int blockCountMax = (inode.size1 % BLOCK_SIZE == 0) ? (inode.size1 / BLOCK_SIZE) : ((inode.size1 / BLOCK_SIZE) + 1);
@@ -564,7 +626,7 @@ int cpin(char* externalFile, char* v6File)
 
             read(externalFileFD, &blockBuf, BLOCK_SIZE); //read a block from external file
             lseek(fd, freeBlock * BLOCK_SIZE, SEEK_SET);
-            write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
+            write(fd, &blockBuf, BLOCK_SIZE); //write a block internaly
 
             inode.addr[blockCount] = freeBlock;
         }
@@ -577,7 +639,7 @@ int cpin(char* externalFile, char* v6File)
 
             read(externalFileFD, &blockBuf, BLOCK_SIZE); //read a block from external file
             lseek(fd, freeBlock * BLOCK_SIZE, SEEK_SET);
-            write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
+            write(fd, &blockBuf, BLOCK_SIZE); //write a block internaly
 
             int addrIndex = blockCount / INDIRECT_SIZE;
             if(inode.addr[addrIndex] == -1){
@@ -586,7 +648,7 @@ int cpin(char* externalFile, char* v6File)
             int singleOffset = blockCount % INDIRECT_SIZE;
 
             lseek(fd,(inode.addr[addrIndex] * BLOCK_SIZE) + (singleOffset * sizeof(int)), SEEK_SET);
-            write(fd, freeBlock, sizeof(int));
+            write(fd, &freeBlock, sizeof(int));
         }
     }
     else if ((inode.flags & (1 << 12)) == (1 << 12) && (inode.flags & (1 << 11)) == 0) //if long (10)
@@ -597,7 +659,7 @@ int cpin(char* externalFile, char* v6File)
 
             read(externalFileFD, &blockBuf, BLOCK_SIZE); //read a block from external file
             lseek(fd, freeBlock * BLOCK_SIZE, SEEK_SET);
-            write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
+            write(fd, &blockBuf, BLOCK_SIZE); //write a block internaly
 
             int addrIndex = (blockCount / INDIRECT_SIZE) / INDIRECT_SIZE;
             if(inode.addr[addrIndex] == -1){
@@ -614,11 +676,11 @@ int cpin(char* externalFile, char* v6File)
             if(blockNum < 2 + superBlock.isize){ //if invalid block number
                 blockNum = get_free_block();
                 lseek(fd, (inode.addr[addrIndex] * BLOCK_SIZE) + (doubleOffset * sizeof(int)), SEEK_SET);
-                write(fd, blockNum, sizeof(int));
+                write(fd, &blockNum, sizeof(int));
             }
 
             lseek(fd, (blockNum * BLOCK_SIZE) + (singleOffset * sizeof(int)), SEEK_SET);
-            write(fd, freeBlock, sizeof(int));
+            write(fd, &freeBlock, sizeof(int));
         }
     }
     else //if super long (11)
@@ -629,7 +691,7 @@ int cpin(char* externalFile, char* v6File)
 
             read(externalFileFD, &blockBuf, BLOCK_SIZE); //read a block from external file
             lseek(fd, freeBlock * BLOCK_SIZE, SEEK_SET);
-            write(fd, blockBuf, BLOCK_SIZE); //write a block internaly
+            write(fd, &blockBuf, BLOCK_SIZE); //write a block internaly
 
             int addrIndex = ((blockCount / INDIRECT_SIZE) / INDIRECT_SIZE) / INDIRECT_SIZE;
             if(inode.addr[addrIndex] == -1){
@@ -647,7 +709,7 @@ int cpin(char* externalFile, char* v6File)
             if(blockNum1 < 2 + superBlock.isize){ //if invalid block number
                 blockNum1 = get_free_block();
                 lseek(fd, (inode.addr[addrIndex] * BLOCK_SIZE) + (tripleOffset * sizeof(int)), SEEK_SET);
-                write(fd, blockNum1, sizeof(int));
+                write(fd, &blockNum1, sizeof(int));
             }
 
             //read the block # in -> check if't a valid block # -> possibly get a free block
@@ -658,16 +720,18 @@ int cpin(char* externalFile, char* v6File)
             if(blockNum2 < 2 + superBlock.isize){ //if invalid block number
                 blockNum2 = get_free_block();
                 lseek(fd, (blockNum1 * BLOCK_SIZE) + (doubleOffset * sizeof(int)), SEEK_SET);
-                write(fd, blockNum2, sizeof(int));
+                write(fd, &blockNum2, sizeof(int));
             }
 
             lseek(fd, (blockNum2 * BLOCK_SIZE) + (singleOffset * sizeof(int)), SEEK_SET);
-            write(fd, freeBlock, sizeof(int));
+            write(fd, &freeBlock, sizeof(int));
         }
     }
+    printf("\tCopying contents done.\n\n");
 
 
     // add a new entry to the root directory (expand root if needed)
+    printf("\tAttempting to add the file into the root directory...\n");
     int dirBlock = getLastFileBlock(1);
 
     dir_type dir;
@@ -675,7 +739,7 @@ int cpin(char* externalFile, char* v6File)
     for(dirCount = 0; dirCount < 32; ++dirCount){ //32 directory entries in a block
         //read in the directory entry
         lseek(fd, (dirBlock * BLOCK_SIZE) + (dirCount * sizeof(dir_type)), SEEK_SET);
-        read(fd,dir,sizeof(dir_type));
+        read(fd, &dir, sizeof(dir_type));
 
         if(dir.inode < 1){//reached the last writen directory entry
             break;
@@ -683,21 +747,40 @@ int cpin(char* externalFile, char* v6File)
     }
     if(dir.inode > 1){//reached the last directory entry in the block but they all ar used
             printf("ERROR: Can't add a file to the root directory. Root directory expansion not implemented \n");
+            printf("\n########## Ending cpin execution ##########\n\n");
             return EXIT_FAILURE;
         }
 
     dir.inode = inodeNum;
-    dir.filename = v6File;
+    strcpy(dir.filename, v6File);
 
     lseek(fd, (dirBlock * BLOCK_SIZE) + (dirCount * sizeof(dir_type)), SEEK_SET);
-    write(fd, dir, sizeof(dir))
+    write(fd, &dir, sizeof(dir));
+    printf("\tAdded the file into the root directory.\n");
 
+    printf("\n########## Ending cpin execution ##########\n\n");
     return EXIT_SUCCESS;
 }
 
 void rm(char * fileName) {
 
 }
+
+/**
+ * @brief Opens the passed external file as a current v6 file system.  
+ * 
+ * @param system 
+ * @return 1 on success, -1 on failure.
+ */
+int openFileSystem(char* system)
+{
+    if ((fd = open(system, O_RDWR)) == -1) {
+        printf("ERROR: Error opening file.\n");
+        return -1;
+    } 
+    return 1;
+}
+
 
 //quit program
 void quit(){
@@ -719,9 +802,10 @@ int main()
     while(1){
         printf("Enter one of the five commands\n");
         printf("initfs file_name fsize isize\n");
-        printf("cpin external_file_name file_system_name\n");
-        printf("cpout file_system_name external_file_name\n");
-        printf("rm file_name\n");
+        printf("open file_system\n");
+        printf("cpin external_file_name internal_file_name\n");
+        printf("cpout internal_file_name external_file_name\n");
+        printf("rm internal_file_name\n");
         printf("q\n");
         printf("> ");
         char command[128];
@@ -734,9 +818,14 @@ int main()
             if (initfs(file_name,atoi(n1),atoi(n2)) == 1) {
                 setup = 1;
             }
-        } else if (strcmp(token,"cpin") == 0) {
+        } else if(strcmp(token,"open") == 0){
+            char* system = strtok(NULL," ");
+            if (openFileSystem(system) == 1) {
+                setup = 1;
+            }
+        }else if (strcmp(token,"cpin") == 0) {
             if (setup != 1) {
-                printf("File System is not yet initialized. Use initfs command first.\n");
+                printf("File System is not yet initialized. Use initfs or open command first.\n");
                 return 0;
             }
             char * sourceFile = strtok(NULL," ");
@@ -748,7 +837,7 @@ int main()
             }
         } else if (strcmp(token,"cpout") == 0) {
             if (setup != 1) {
-                printf("File System is not yet initialized. Use initfs command first.\n");
+                printf("File System is not yet initialized. Use initfs or open command first.\n");
                 return 0;
             }
             char * sourceFile = strtok(NULL," ");
@@ -760,7 +849,7 @@ int main()
             }
         } else if (strcmp(token,"rm") == 0) {
             if (setup != 1) {
-                printf("File System is not yet initialized. Use initfs command first.\n");
+                printf("File System is not yet initialized. Use initfs or open command first.\n");
                 return 0;
             }
             char * fileName = strtok(NULL," ");

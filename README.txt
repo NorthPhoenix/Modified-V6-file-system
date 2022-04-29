@@ -5,6 +5,6 @@ Zubair Shaik
 
 Compile Instructions:
 To build:
-gcc mv6.c -o filename 
+gcc mod-v6.c -o filename 
 To run:
 ./filename

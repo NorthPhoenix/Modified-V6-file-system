@@ -21,7 +21,10 @@ Nikita:
     - all of getLastFileBlock()
     - all of fileSize()
 
-Haniya: worked on add_free_block() and initfs() functions. 
+Haniya: -add_free_block() 
+        -initfs() 
+        -rm()
+        
 
 */
 #include <stdio.h>

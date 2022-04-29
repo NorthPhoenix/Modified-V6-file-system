@@ -773,7 +773,51 @@ int cpin(char* externalFile, char* v6File)
 }
 
 void rm(char * fileName) {
+        int blockNumber,x,i;
+        inode_type curINode = getInode(iNode);
+        blockNumber = curINode.addr[0];
+        dir_type directory[100];
+        //readFromBlockOffset
+        lseek(fd,(BLOCK_SIZE * blockNumber) + 0, SEEK_SET);
+        read(fd,directory,curINode.size0);
 
+        for(i = 0; i < curINode.size/sizeof(dEntry); i++)
+        {
+                if(strcmp(filename,directory[i].filename)==0){
+                        Inode file = getInode(directory[i].inode);
+                        if(file.flags ==(1<<15)){
+                                for(x = 0; x<file.size/BLOCK_SIZE; x++)
+                                {
+                                        blockNumber = file.addr[x];
+                                        addFreeBlock(blockNumber);
+                                }
+                                if(0<file.size%BLOCK_SIZE){
+                                        blockNumber = file.addr[x];
+                                        addFreeBlock(blockNumber);
+                                }
+                                addFreeBlock(directory[i].inode);
+                                directory[i]=directory[(curINode.size/sizeof(dEntry))-1];
+                                curINode.size-=sizeof(dEntry);
+                                //write to block
+                                lseek(fd,  BLOCK_SIZE * curINode.addr[0], SEEK_SET);
+                                write(fd, directory, curINode.size);
+
+                                inode_writer(iNode,curINode);
+                        }
+                        else{
+                                printf("\n%s\n","NOT A FILE!");
+                        }
+                        return;
+                }
+        }
+}
+inode_type getInode(int INumber){
+        inode_type iNode;
+        int blockNumber = (INumber * INODE_SIZE) / BLOCK_SIZE;    // need to remove 
+        int offset = (INumber * INODE_SIZE) % BLOCK_SIZE;
+        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
+        read(fd,&iNode,INODE_SIZE);
+        return iNode;
 }
 
 /**

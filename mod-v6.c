@@ -774,50 +774,45 @@ int cpin(char* externalFile, char* v6File)
 
 void rm(char * fileName) {
         int blockNumber,x,i;
-        inode_type curINode = getInode(iNode);
+        int currInum = findFileInRoot(fileName);
+        inode_type currInode;
+        inode_type curINode = inode_reader(currInum,currInode);
         blockNumber = curINode.addr[0];
         dir_type directory[100];
-        //readFromBlockOffset
+        //read from block offset
         lseek(fd,(BLOCK_SIZE * blockNumber) + 0, SEEK_SET);
         read(fd,directory,curINode.size0);
 
-        for(i = 0; i < curINode.size/sizeof(dEntry); i++)
+        for(i = 0; i < curINode.size0/sizeof(dir_type); i++)
         {
-                if(strcmp(filename,directory[i].filename)==0){
-                        Inode file = getInode(directory[i].inode);
+                if(strcmp(fileName,directory[i].filename)==0){
+                        inode_type file;
+                        file = inode_reader(currInum,file);
                         if(file.flags ==(1<<15)){
-                                for(x = 0; x<file.size/BLOCK_SIZE; x++)
+                                for(x = 0; x<file.size0/BLOCK_SIZE; x++)
                                 {
                                         blockNumber = file.addr[x];
-                                        addFreeBlock(blockNumber);
+                                        add_free_block(blockNumber);
                                 }
-                                if(0<file.size%BLOCK_SIZE){
+                                if(0<file.size0%BLOCK_SIZE){
                                         blockNumber = file.addr[x];
-                                        addFreeBlock(blockNumber);
+                                        add_free_block(blockNumber);
                                 }
-                                addFreeBlock(directory[i].inode);
-                                directory[i]=directory[(curINode.size/sizeof(dEntry))-1];
-                                curINode.size-=sizeof(dEntry);
+                                add_free_block(directory[i].inode);
+                                directory[i]=directory[(curINode.size0/sizeof(dir_type))-1];
+                                curINode.size0-=sizeof(dir_type);
                                 //write to block
                                 lseek(fd,  BLOCK_SIZE * curINode.addr[0], SEEK_SET);
-                                write(fd, directory, curINode.size);
+                                write(fd, directory, curINode.size0);
 
                                 inode_writer(iNode,curINode);
                         }
                         else{
-                                printf("\n%s\n","NOT A FILE!");
+                                printf("\n%s\n","invalid file");
                         }
                         return;
                 }
         }
-}
-inode_type getInode(int INumber){
-        inode_type iNode;
-        int blockNumber = (INumber * INODE_SIZE) / BLOCK_SIZE;    // need to remove 
-        int offset = (INumber * INODE_SIZE) % BLOCK_SIZE;
-        lseek(fd,(BLOCK_SIZE * blockNumber) + offset, SEEK_SET);
-        read(fd,&iNode,INODE_SIZE);
-        return iNode;
 }
 
 /**

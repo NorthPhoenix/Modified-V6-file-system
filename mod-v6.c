@@ -1,7 +1,7 @@
 /*
 University of Texas at Dallas--Computer Science Department
 CS 4348.005 Operating Systems Concepts Spring 2022
-Project 2 Part 1
+Project 2 Part 2
 
 Members:
 Haniya Zafar
@@ -10,7 +10,17 @@ Zubair Shaik
 
 Contributions: 
 Zubair: worked on the add_free_block(), and get_free_block(), and main() functions.
-Nikita: worked on add_free_block() and initfs() functions + debugging.
+Nikita: 
+    - add_free_block() + debugging
+    - initfs() + debugging
+    - all of cpin()
+    - all of openFileSystem()
+    - all of findFileInDirBlock()
+    - all of getNextFileBlock()
+    - all of findFileInRoot()
+    - all of getLastFileBlock()
+    - all of fileSize()
+
 Haniya: worked on add_free_block() and initfs() functions. 
 
 */

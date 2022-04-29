@@ -87,10 +87,7 @@ int getNextFileBlock(inode_type inode, int* save);
 int findFileInRoot(char* filename);
 int getLastFileBlock(int inodeNum);
 off_t fileSize(const char *filename);
-
 void quit();
-
-
 
 int open_fs(char *file_name)
 {

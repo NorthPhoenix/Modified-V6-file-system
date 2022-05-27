@@ -1,30 +1,9 @@
 /*
 University of Texas at Dallas--Computer Science Department
 CS 4348.005 Operating Systems Concepts Spring 2022
-Project 2 Part 2
+Project 2
+Modified V6 File System
 
-Members:
-Haniya Zafar
-Nikita Istomin
-Zubair Shaik
-
-Contributions: 
-Zubair: worked on the add_free_block(), and get_free_block(), and main() functions.
-Nikita: 
-    - add_free_block() + debugging
-    - initfs() + debugging
-    - all of cpin()
-    - all of openFileSystem()
-    - all of findFileInDirBlock()
-    - all of getNextFileBlock()
-    - all of findFileInRoot()
-    - all of getLastFileBlock()
-    - all of fileSize()
-
-Haniya: -add_free_block() 
-        -initfs() 
-        -rm()
-        
 
 */
 #include <stdio.h>
@@ -74,8 +53,6 @@ typedef struct
 superblock_type superBlock;
 inode_type root;
 int fd;
-int iNode;
-int zeroArr[256];
 int chainArr[256];
 
 
@@ -101,6 +78,8 @@ int findFileInRoot(char* filename);
 int getLastFileBlock(int inodeNum);
 off_t fileSize(const char *filename);
 void quit();
+
+
 
 int open_fs(char *file_name)
 {
@@ -255,53 +234,9 @@ int initfs(char* fileName, int blocks, int inodeBlocks) {
 
     lseek(fd, (2 + inodeBlocks) * BLOCK_SIZE, SEEK_SET);
     write(fd, directory, 2*sizeof(dir_type));
-    iNode = 0;
     // Print initialization message
     printf("File system initialized in \"%s\"\n\n", fileName);
     return 1;
-}
-
-void cpout(char * sourcePath, char* destinationPath) {
-    char buf[BLOCK_SIZE] = {0};
-    dir_type direct[100];
-    inode_type currInode;
-    int fS, y;
-    if ((fS = open(sourcePath, O_RDWR | O_CREAT, 0600)) == -1) {
-        printf("Error opening file ");
-        return;
-    } 
-    int blockNum = (iNode * INODE_SIZE) / BLOCK_SIZE;
-    int off = (iNode * INODE_SIZE) % BLOCK_SIZE;
-    lseek(fd,(BLOCK_SIZE * blockNum) + off, SEEK_SET);
-    read(fd,&currInode,INODE_SIZE);
-    int currBlockNum = currInode.addr[0];
-    lseek(fd,(BLOCK_SIZE * currBlockNum), SEEK_SET);
-    read(fd,direct,currInode.size0);
-    for (int i = 0; i < currInode.size0 / sizeof(dir_type); i++) {
-        if (strcmp(destinationPath, direct[i].filename) == 0) {
-            inode_type currFile;
-            int blockNum = (direct[i].inode * INODE_SIZE) / BLOCK_SIZE;
-            int off = (direct[i].inode * INODE_SIZE) % BLOCK_SIZE;
-            lseek(fd,(BLOCK_SIZE * blockNum) + off, SEEK_SET);
-            read(fd,&iNode,INODE_SIZE);
-            unsigned int * s = currFile.addr;
-            if (currFile.flags == (1 << 15)) {
-                for (y = 0; y < currFile.size0/BLOCK_SIZE; y++) {
-                    blockNum = s[y];
-                    lseek(fd,(BLOCK_SIZE * blockNum), SEEK_SET);
-                    read(fd,buf,BLOCK_SIZE);
-                    write(fS, buf,BLOCK_SIZE);
-                }
-                blockNum = s[y];
-                lseek(fd,(BLOCK_SIZE * blockNum), SEEK_SET);
-                read(fd,buf,currFile.size0 % BLOCK_SIZE);
-                write(fS, buf, currFile.size0 % BLOCK_SIZE);
-            } else {
-                printf("no file \n");
-            }
-            return;
-        }
-    }
 }
 
 
@@ -772,47 +707,16 @@ int cpin(char* externalFile, char* v6File)
     return EXIT_SUCCESS;
 }
 
-void rm(char * fileName) {
-        int blockNumber,x,i;
-        int currInum = findFileInRoot(fileName);
-        inode_type currInode;
-        inode_type curINode = inode_reader(currInum,currInode);
-        blockNumber = curINode.addr[0];
-        dir_type directory[100];
-        //read from block offset
-        lseek(fd,(BLOCK_SIZE * blockNumber) + 0, SEEK_SET);
-        read(fd,directory,curINode.size0);
 
-        for(i = 0; i < curINode.size0/sizeof(dir_type); i++)
-        {
-                if(strcmp(fileName,directory[i].filename)==0){
-                        inode_type file;
-                        file = inode_reader(currInum,file);
-                        if(file.flags ==(1<<15)){
-                                for(x = 0; x<file.size0/BLOCK_SIZE; x++)
-                                {
-                                        blockNumber = file.addr[x];
-                                        add_free_block(blockNumber);
-                                }
-                                if(0<file.size0%BLOCK_SIZE){
-                                        blockNumber = file.addr[x];
-                                        add_free_block(blockNumber);
-                                }
-                                add_free_block(directory[i].inode);
-                                directory[i]=directory[(curINode.size0/sizeof(dir_type))-1];
-                                curINode.size0-=sizeof(dir_type);
-                                //write to block
-                                lseek(fd,  BLOCK_SIZE * curINode.addr[0], SEEK_SET);
-                                write(fd, directory, curINode.size0);
+void cpout(char * sourcePath, char* destinationPath)
+{
+    return;
+}
 
-                                inode_writer(iNode,curINode);
-                        }
-                        else{
-                                printf("\n%s\n","invalid file");
-                        }
-                        return;
-                }
-        }
+
+void rm(char * fileName) 
+{
+    return;
 }
 
 /**
@@ -853,8 +757,8 @@ int main()
         printf("initfs file_name fsize isize\n");
         printf("open file_system\n");
         printf("cpin external_file_name internal_file_name\n");
-        printf("cpout internal_file_name external_file_name\n");
-        printf("rm internal_file_name\n");
+        // printf("cpout internal_file_name external_file_name\n");
+        // printf("rm internal_file_name\n");
         printf("q\n");
         printf("> ");
         char command[128];
@@ -867,12 +771,14 @@ int main()
             if (initfs(file_name,atoi(n1),atoi(n2)) == 1) {
                 setup = 1;
             }
-        } else if(strcmp(token,"open") == 0){
+        } 
+        else if(strcmp(token,"open") == 0){
             char* system = strtok(NULL," ");
             if (openFileSystem(system) == 1) {
                 setup = 1;
             }
-        }else if (strcmp(token,"cpin") == 0) {
+        }
+        else if (strcmp(token,"cpin") == 0) {
             if (setup != 1) {
                 printf("File System is not yet initialized. Use initfs or open command first.\n");
                 return 0;
@@ -884,32 +790,36 @@ int main()
             } else {
                 cpin(sourceFile, destinationFile);
             }
-        } else if (strcmp(token,"cpout") == 0) {
-            if (setup != 1) {
-                printf("File System is not yet initialized. Use initfs or open command first.\n");
-                return 0;
-            }
-            char * sourceFile = strtok(NULL," ");
-            char * destinationFile = strtok(NULL," ");;
-            if (!sourceFile || !destinationFile) {
-                printf("Enter a source and destination path. \n");
-            } else {
-                cpout(sourceFile, destinationFile);
-            }
-        } else if (strcmp(token,"rm") == 0) {
-            if (setup != 1) {
-                printf("File System is not yet initialized. Use initfs or open command first.\n");
-                return 0;
-            }
-            char * fileName = strtok(NULL," ");
-            if (!fileName) {
-                printf("Enter a filename\n");
-            } else {
-                rm(fileName);
-            }
-        } else if(strcmp(token,"q") == 0){
+        } 
+        // else if (strcmp(token,"cpout") == 0) {
+        //     if (setup != 1) {
+        //         printf("File System is not yet initialized. Use initfs or open command first.\n");
+        //         return 0;
+        //     }
+        //     char * sourceFile = strtok(NULL," ");
+        //     char * destinationFile = strtok(NULL," ");;
+        //     if (!sourceFile || !destinationFile) {
+        //         printf("Enter a source and destination path. \n");
+        //     } else {
+        //         cpout(sourceFile, destinationFile);
+        //     }
+        // } 
+        // else if (strcmp(token,"rm") == 0) {
+        //     if (setup != 1) {
+        //         printf("File System is not yet initialized. Use initfs or open command first.\n");
+        //         return 0;
+        //     }
+        //     char * fileName = strtok(NULL," ");
+        //     if (!fileName) {
+        //         printf("Enter a filename\n");
+        //     } else {
+        //         rm(fileName);
+        //     }
+        // } 
+        else if(strcmp(token,"q") == 0){
             quit();
-        }else{
+        }
+        else{
             printf("No command found, Try again\n");
         }
     }

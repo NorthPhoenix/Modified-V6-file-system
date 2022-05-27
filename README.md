@@ -2,13 +2,17 @@
   <h1>
     University of Texas at Dallas--Computer Science Department<br>
     CS 4348.005 Operating Systems Concepts Spring 2022<br>
-    Project 2 Part 2
+    Project 2
   </h1>
 </div>
 
 ## Description
+The purpose of this project is to recreate Unix V6 file system.
+This project is done in C/C++ only.
 
-A modification to V6 file system has been done: Block size is 1024 Bytes, `i-node` size is
+This is a group project and 3-member groups have been formed on elearning.
+
+V6 file system is highly restrictive. A modification has been done: Block size is 1024 Bytes, `i-node` size is
 64 Bytes and `i-node`’s structure and directory entry struc have been modified as well and given below:
 ```C
 typedef struct {
@@ -48,22 +52,6 @@ Flags field has a small change: bits a, b, c are as before. Bits d and e are to 
 
 If file is small `addr[9]` has 9 direct block addresses. If file is medium, `addr[9]` has addresses of 9 single indirect blocks. If file is large, each element of `addr[]` is address of a double indirect block. If file is super long, each element of `addr[]` is address of a triple indirect block.
 
-## Goals
-
-You need to implement the following additional commands and add to the project 2-part 1:
-**Keep in mind that all files in v6 file system that you need to deal with in this project part are in the root directory and there will be no subdirectories.**
-
-1. **`cpin externalfile v6-file`**
-   - Creat a new file called `v6-file` in the v6 file system and fill the contents of the newly created file with the contents of the `externalfile`.
-2. **`cpout v6-file externalfile`**
-   - If the v6-file exists, create `externalfile` and make the externalfile's contents equal to `v6-file`.
-3. **`rm v6-file`**
-   - Delete the file v6_file from the v6 file system. Remove all the data blocks of the file, free the i-node and remove the directory entry.
-4. **`open file_system`**
-   - Open a native Unix machine file `file_system` that has been formated like a modified V6 file system.
-5. **`q`**
-   - Save all changes and quit. 
-
 ## User Commands
 
 1. **`initfs file_name n1 n2`**
@@ -80,6 +68,7 @@ You need to implement the following additional commands and add to the project 2
    - Save and quit the program
 
 
-## Due Date
-April 28, 2022 11:55pm
-
+## Group members
+- [Nikita Istomin](https://github.com/NorthPhoenix)
+- [Zubair Shaik](https://github.com/ZubairShaik7)
+- [Haniya Zafar](https://github.com/han1ya)
